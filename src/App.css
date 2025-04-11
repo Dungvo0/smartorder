@@ -23,7 +23,16 @@
   font-size: calc(10px + 2vmin);
   color: white;
 }
+.card img {
+  height: 180px;
+  object-fit: cover;
+}
 
+h3 {
+  color: #ff6600;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
 .App-link {
   color: #61dafb;
 }
