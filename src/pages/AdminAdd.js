@@ -13,7 +13,6 @@ const AdminAdd = () => {
     image: "",
   });
 
-  // Tải dữ liệu từ Firestore
   const fetchMenu = async () => {
     const querySnapshot = await getDocs(collection(db, "Menu"));
     const items = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -24,7 +23,6 @@ const AdminAdd = () => {
     fetchMenu();
   }, []);
 
-  // Xử lý chọn ảnh từ thiết bị
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -36,7 +34,6 @@ const AdminAdd = () => {
     }
   };
 
-  // Thêm món mới vào Firestore
   const addMenuItem = async () => {
     if (!newItem.name || !newItem.price || !newItem.image) {
       alert("Vui lòng nhập đầy đủ thông tin!");
@@ -49,7 +46,8 @@ const AdminAdd = () => {
         name: newItem.name,
         price: newItem.price,
         category: newItem.category,
-        image: newItem.image, // base64
+        image: newItem.image,
+        status: "available", // ✅ Thêm trường status mặc định
         createdAt: serverTimestamp(),
       });
       setNewItem({ name: "", price: "", category: "food", image: "" });
@@ -62,7 +60,6 @@ const AdminAdd = () => {
     }
   };
 
-  // Xoá món
   const removeMenuItem = async (id) => {
     await deleteDoc(doc(db, "Menu", id));
     fetchMenu();
