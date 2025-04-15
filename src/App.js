@@ -6,7 +6,6 @@ import AdminAdd from "./pages/AdminAdd";
 import OrderManagement from "./pages/OrderManagement";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import TestFirebase from "./pages/TestFirebase";
-
 function App() {
   return (
     <Router>
@@ -18,6 +17,8 @@ function App() {
             <Nav.Link as={Link} to="/admin/menu">Quản lý menu</Nav.Link>
             <Nav.Link as={Link} to="/admin/orders">Quản lý Bàn</Nav.Link>
             <Nav.Link as={Link} to="/admin/add">Thêm món </Nav.Link>
+            
+
           </Nav>
         </Container>
         <div className="App">
