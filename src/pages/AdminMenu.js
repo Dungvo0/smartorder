@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Table, Button, Form, Container, Modal } from "react-bootstrap";
+import { Table, Button, Form, Container, Modal, OverlayTrigger, Tooltip } from "react-bootstrap";
 import { db } from "../firebaseConfig";
 import {
   collection,
@@ -47,7 +47,7 @@ const AdminMenu = () => {
   const startEditing = (item) => {
     setEditingItemId(item.id);
     setEditedName(item.name);
-    setEditedPrice(item.price);
+    setEditedPrice(item.originalPrice || item.price); // Sửa cả khi đã có giảm giá
   };
 
   const saveChanges = async (id) => {
@@ -55,6 +55,8 @@ const AdminMenu = () => {
       await updateDoc(doc(db, "Menu", id), {
         name: editedName,
         price: Number(editedPrice),
+        originalPrice: null, // Nếu admin chỉnh giá thì xóa giảm giá cũ
+        discountPercent: null,
       });
       setEditingItemId(null);
       fetchMenu();
@@ -71,8 +73,15 @@ const AdminMenu = () => {
 
   const applyDiscountToItem = async () => {
     try {
-      const newPrice = Math.floor(discountItem.price * (1 - discountValue / 100));
-      await updateDoc(doc(db, "Menu", discountItem.id), { price: newPrice });
+      const originalPrice = discountItem.originalPrice || discountItem.price;
+      const discountedPrice = Math.floor(originalPrice * (1 - discountValue / 100));
+
+      await updateDoc(doc(db, "Menu", discountItem.id), {
+        originalPrice,
+        price: discountedPrice,
+        discountPercent: discountValue,
+      });
+
       setShowDiscountModal(false);
       fetchMenu();
     } catch (error) {
@@ -91,14 +100,28 @@ const AdminMenu = () => {
     }
   };
 
+  const renderNameWithTooltip = (item) => {
+    if (item.status === "unavailable") {
+      return (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip>Món này đã hết</Tooltip>}
+        >
+          <span style={{ color: "gray" }}>{item.name}</span>
+        </OverlayTrigger>
+      );
+    }
+    return item.name;
+  };
+
   return (
     <Container>
       <h2 className="mt-4 mb-3">🛠️ Quản lý Menu</h2>
-      <Table striped bordered hover>
+      <Table striped bordered hover responsive>
         <thead>
           <tr>
             <th>Tên món</th>
-            <th>Giá (VND)</th>
+            <th>Giá</th>
             <th>Trạng thái</th>
             <th>Hành động</th>
           </tr>
@@ -113,7 +136,7 @@ const AdminMenu = () => {
                     onChange={(e) => setEditedName(e.target.value)}
                   />
                 ) : (
-                  item.name
+                  renderNameWithTooltip(item)
                 )}
               </td>
               <td>
@@ -123,8 +146,17 @@ const AdminMenu = () => {
                     value={editedPrice}
                     onChange={(e) => setEditedPrice(e.target.value)}
                   />
+                ) : item.originalPrice ? (
+                  <>
+                    <span style={{ textDecoration: "line-through", color: "gray", marginRight: 5 }}>
+                      {item.originalPrice.toLocaleString()}₫
+                    </span>
+                    <span style={{ color: "red", fontWeight: "bold" }}>
+                      {item.price.toLocaleString()}₫ (-{item.discountPercent}%)
+                    </span>
+                  </>
                 ) : (
-                  item.price.toLocaleString()
+                  <>{item.price.toLocaleString()}₫</>
                 )}
               </td>
               <td>
@@ -178,24 +210,23 @@ const AdminMenu = () => {
         </tbody>
       </Table>
 
-      {/* Modal chọn giảm giá */}
+      {/* Modal chọn mức giảm giá */}
       <Modal show={showDiscountModal} onHide={() => setShowDiscountModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Chọn mức giảm giá</Modal.Title>
+          <Modal.Title>Chọn mức giảm giá (%)</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Group>
-            <Form.Label>Mức giảm giá (%)</Form.Label>
+            <Form.Label>Mức giảm giá</Form.Label>
             <Form.Select
               value={discountValue}
               onChange={(e) => setDiscountValue(parseInt(e.target.value))}
             >
-              <option value={0}>0%</option>
-              <option value={10}>10%</option>
-              <option value={20}>20%</option>
-              <option value={30}>30%</option>
-              <option value={40}>40%</option>
-              <option value={50}>50%</option>
+              {[0, 10, 20, 30, 40, 50].map((value) => (
+                <option key={value} value={value}>
+                  {value}%
+                </option>
+              ))}
             </Form.Select>
           </Form.Group>
         </Modal.Body>
