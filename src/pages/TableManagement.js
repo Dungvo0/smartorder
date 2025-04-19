@@ -16,6 +16,8 @@ import {
   doc,
   updateDoc,
   deleteField,
+  setDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
@@ -24,6 +26,7 @@ const TableManagement = () => {
   const [selectedTable, setSelectedTable] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editableOrders, setEditableOrders] = useState([]);
+  const [discount, setDiscount] = useState(0);
 
   const fetchTables = async () => {
     const querySnapshot = await getDocs(collection(db, "Tables"));
@@ -41,12 +44,14 @@ const TableManagement = () => {
   const handleViewTable = (table) => {
     setSelectedTable(table);
     setEditableOrders(table.orders ? [...table.orders] : []);
+    setDiscount(0);
     setShowModal(true);
   };
 
   const handleUpdateItemField = (index, field, value) => {
     const updated = [...editableOrders];
-    updated[index][field] = field === "price" || field === "quantity" ? Number(value) : value;
+    updated[index][field] =
+      field === "price" || field === "quantity" ? Number(value) : value;
     setEditableOrders(updated);
   };
 
@@ -72,11 +77,49 @@ const TableManagement = () => {
 
   const handlePayment = async () => {
     const tableRef = doc(db, "Tables", selectedTable.id);
+    const orderTotal = calculateTotal();
+    const discountedTotal = orderTotal - (orderTotal * discount) / 100;
+
+    const orderData = {
+      tableId: selectedTable.id,
+      orders: editableOrders,
+      totalAmount: discountedTotal,
+      discount: discount,
+      date: Timestamp.now(),
+      week: getWeekNumber(new Date()),
+      month: new Date().getMonth() + 1,
+    };
+
+    await setDoc(doc(db, "Orders", selectedTable.id + "-" + Date.now()), orderData);
     await updateDoc(tableRef, {
       status: "Trống",
       orders: deleteField(),
+      reserved: false,
+      reservationInfo: deleteField(),
     });
     alert("✅ Thanh toán thành công. Bàn đã được đặt lại về trạng thái Trống.");
+    setShowModal(false);
+    fetchTables();
+  };
+
+  const handleReservation = async () => {
+    const name = prompt("Nhập tên khách đặt:");
+    const phone = prompt("Nhập số điện thoại:");
+    const time = prompt("Nhập thời gian dự kiến:");
+
+    if (!name || !phone || !time) {
+      alert("⚠️ Vui lòng nhập đầy đủ thông tin.");
+      return;
+    }
+
+    const tableRef = doc(db, "Tables", selectedTable.id);
+    await updateDoc(tableRef, {
+      reserved: true,
+      reservationInfo: { name, phone, time },
+      status: "Đặt trước", // ✅ cập nhật trạng thái
+    });
+
+    alert("✅ Bàn đã được đặt trước.");
     setShowModal(false);
     fetchTables();
   };
@@ -88,6 +131,24 @@ const TableManagement = () => {
     );
   };
 
+  const getWeekNumber = (date) => {
+    const startDate = new Date(date.getFullYear(), 0, 1);
+    const days = Math.floor((date - startDate) / (24 * 60 * 60 * 1000));
+    return Math.ceil((days + 1) / 7);
+  };
+
+  const getCardColor = (status) => {
+    if (status === "Trống") return "light";
+    if (status === "Đặt trước") return "info";
+    return "warning";
+  };
+
+  const getBadgeColor = (status) => {
+    if (status === "Trống") return "success";
+    if (status === "Đặt trước") return "info";
+    return "danger";
+  };
+
   return (
     <Container>
       <h2 className="mt-4">📋 Quản lý bàn ăn</h2>
@@ -96,16 +157,14 @@ const TableManagement = () => {
           <Col key={table.id} md={3} className="mb-4">
             <Card
               style={{ cursor: "pointer" }}
-              bg={table.status === "Trống" ? "light" : "warning"}
+              bg={getCardColor(table.status)}
               onClick={() => handleViewTable(table)}
             >
               <Card.Body>
                 <Card.Title>Bàn {table.id}</Card.Title>
                 <Card.Text>
                   Trạng thái:{" "}
-                  <Badge
-                    bg={table.status === "Trống" ? "success" : "danger"}
-                  >
+                  <Badge bg={getBadgeColor(table.status)}>
                     {table.status || "Không xác định"}
                   </Badge>
                 </Card.Text>
@@ -118,7 +177,7 @@ const TableManagement = () => {
         ))}
       </Row>
 
-      {/* Modal */}
+      {/* Modal chi tiết bàn */}
       <Modal
         show={showModal}
         onHide={() => setShowModal(false)}
@@ -149,11 +208,7 @@ const TableManagement = () => {
                         value={item.quantity}
                         min="1"
                         onChange={(e) =>
-                          handleUpdateItemField(
-                            idx,
-                            "quantity",
-                            e.target.value
-                          )
+                          handleUpdateItemField(idx, "quantity", e.target.value)
                         }
                       />
                     </Col>
@@ -189,9 +244,28 @@ const TableManagement = () => {
           )}
 
           <h5 className="mt-3 text-end">
-            Tổng tiền:{" "}
-            <strong>{calculateTotal().toLocaleString()} VND</strong>
+            Tổng tiền: <strong>{calculateTotal().toLocaleString()} VND</strong>
           </h5>
+
+          <Form.Group controlId="discount" className="mt-3">
+            <Form.Label>Giảm giá (%)</Form.Label>
+            <Form.Control
+              type="number"
+              min="0"
+              max="100"
+              value={discount}
+              onChange={(e) => setDiscount(Number(e.target.value))}
+            />
+          </Form.Group>
+
+          {selectedTable?.reserved && selectedTable?.reservationInfo && (
+            <div className="mt-4 p-3 border rounded bg-light">
+              <h5>📅 Thông tin đặt trước:</h5>
+              <p><strong>Tên khách:</strong> {selectedTable.reservationInfo.name}</p>
+              <p><strong>SĐT:</strong> {selectedTable.reservationInfo.phone}</p>
+              <p><strong>Thời gian:</strong> {selectedTable.reservationInfo.time}</p>
+            </div>
+          )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="success" onClick={handleSaveChanges}>
@@ -199,6 +273,13 @@ const TableManagement = () => {
           </Button>
           <Button variant="danger" onClick={handlePayment}>
             💰 Thanh toán
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleReservation}
+            disabled={selectedTable?.status !== "Trống"}
+          >
+            📅 Đặt trước bàn
           </Button>
           <Button variant="secondary" onClick={() => setShowModal(false)}>
             Đóng

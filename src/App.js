@@ -6,6 +6,7 @@ import AdminAdd from "./pages/AdminAdd";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import TestFirebase from "./pages/TestFirebase";
 import TableManagement from "./pages/TableManagement";
+import RevenueStatistics from "./pages/RevenueStatistics";  
 function App() {
   return (
     <Router>
@@ -17,6 +18,7 @@ function App() {
             <Nav.Link as={Link} to="/admin/menu">Quản lý menu</Nav.Link>
             <Nav.Link as={Link} to="/admin/table">Quản lý Bàn</Nav.Link>
             <Nav.Link as={Link} to="/admin/add">Thêm món </Nav.Link>
+            <Nav.Link as={Link} to="/admin/revenueStatistics"> Thống kê </Nav.Link>
             
 
           </Nav>
@@ -30,6 +32,7 @@ function App() {
         <Route path="/admin/menu" element={<AdminMenu />} />
         <Route path="/admin/table" element={<TableManagement />} />
         <Route path="/admin/add" element={<AdminAdd/>} />
+        <Route path="/admin/revenueStatistics" element={<RevenueStatistics/>} />
       </Routes>
     </Router>
   );

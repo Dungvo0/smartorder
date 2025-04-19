@@ -29,6 +29,7 @@ const OrderPage = () => {
   const [cart, setCart] = useState([]);
   const [selectedTable, setSelectedTable] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [tableStatuses, setTableStatuses] = useState({});
 
   const tables = [
     ...Array.from({ length: 10 }, (_, i) => `A${i + 1}`),
@@ -46,8 +47,18 @@ const OrderPage = () => {
     setLoading(false);
   };
 
+  const fetchTableStatuses = async () => {
+    const snapshot = await getDocs(collection(db, "Tables"));
+    const statuses = {};
+    snapshot.forEach((doc) => {
+      statuses[doc.id] = doc.data().status;
+    });
+    setTableStatuses(statuses);
+  };
+
   useEffect(() => {
     fetchMenu();
+    fetchTableStatuses();
   }, []);
 
   const addToCart = (item) => {
@@ -76,33 +87,44 @@ const OrderPage = () => {
       alert("Vui lòng chọn bàn và ít nhất 1 món!");
       return;
     }
-
+  
     const tableRef = doc(db, "Tables", selectedTable);
     const tableDoc = await getDoc(tableRef);
-
+  
     if (!tableDoc.exists()) {
-      await setDoc(tableRef, {
-        status: "Đang dùng",
-        orders: [],
-      });
+      alert("❌ Bàn không tồn tại.");
+      return;
     }
-
-    const tableData = tableDoc.exists() ? tableDoc.data() : {};
+  
+    const currentStatus = tableDoc.data().status;
+  
+    // ✅ Kiểm tra trạng thái mới nhất từ Firebase
+    if (currentStatus === "Đặt trước") {
+      alert("❌ Bàn này hiện đang được đặt trước, vui lòng chọn bàn khác.");
+      setShowConfirmModal(false);
+      return;
+    }
+  
+    const tableData = tableDoc.data();
     const newOrders = [...(tableData.orders || []), ...cart.map((item) => ({
       ...item,
       status: "Chờ hoàn thành",
     }))];
-
+  
     await updateDoc(tableRef, {
       orders: newOrders,
       status: "Đang dùng",
     });
-
+  
     setCart([]);
     setSelectedTable("");
     setShowConfirmModal(false);
     alert("✅ Đặt món thành công!");
+    fetchTableStatuses(); // Cập nhật lại trạng thái
   };
+  
+  
+  
 
   const renderItems = (category) =>
     menuItems
@@ -127,7 +149,6 @@ const OrderPage = () => {
             <Card.Body>
               <Card.Title>{item.name}</Card.Title>
               <Card.Text>
-                {/* Display price with discount if available */}
                 {item.discountPercent ? (
                   <>
                     <span
@@ -190,14 +211,26 @@ const OrderPage = () => {
         <Form.Label>Chọn bàn</Form.Label>
         <Form.Select
           value={selectedTable}
-          onChange={(e) => setSelectedTable(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            const status = tableStatuses[value];
+            if (status === "Đặt trước") {
+              alert("❌ Bàn này đã được đặt trước, vui lòng chọn bàn khác.");
+              return;
+            }
+            setSelectedTable(value);
+          }}
         >
           <option value="">-- Chọn bàn --</option>
-          {tables.map((table) => (
-            <option key={table} value={table}>
-              {table}
-            </option>
-          ))}
+          {tables.map((table) => {
+            const status = tableStatuses[table];
+            const isReserved = status === "Đặt trước";
+            return (
+              <option key={table} value={table} disabled={isReserved}>
+                {table} {isReserved ? "(Đã đặt trước)" : ""}
+              </option>
+            );
+          })}
         </Form.Select>
       </Form.Group>
 
