@@ -21,6 +21,7 @@ import {
   updateDoc,
   getDoc,
 } from "firebase/firestore";
+import Cart from "../components/Cart";
 
 const OrderPage = () => {
   const [activeTab, setActiveTab] = useState("food");
@@ -82,49 +83,49 @@ const OrderPage = () => {
     );
   };
 
+  const removeFromCart = (id) => {
+    setCart(cart.filter((i) => i.id !== id));
+  };
+
   const confirmOrder = async () => {
     if (!selectedTable || cart.length === 0) {
       alert("Vui lòng chọn bàn và ít nhất 1 món!");
       return;
     }
-  
+
     const tableRef = doc(db, "Tables", selectedTable);
     const tableDoc = await getDoc(tableRef);
-  
+
     if (!tableDoc.exists()) {
       alert("❌ Bàn không tồn tại.");
       return;
     }
-  
+
     const currentStatus = tableDoc.data().status;
-  
-    // ✅ Kiểm tra trạng thái mới nhất từ Firebase
+
     if (currentStatus === "Đặt trước") {
       alert("❌ Bàn này hiện đang được đặt trước, vui lòng chọn bàn khác.");
       setShowConfirmModal(false);
       return;
     }
-  
+
     const tableData = tableDoc.data();
     const newOrders = [...(tableData.orders || []), ...cart.map((item) => ({
       ...item,
       status: "Chờ hoàn thành",
     }))];
-  
+
     await updateDoc(tableRef, {
       orders: newOrders,
       status: "Đang dùng",
     });
-  
+
     setCart([]);
     setSelectedTable("");
     setShowConfirmModal(false);
     alert("✅ Đặt món thành công!");
-    fetchTableStatuses(); // Cập nhật lại trạng thái
+    fetchTableStatuses();
   };
-  
-  
-  
 
   const renderItems = (category) =>
     menuItems
@@ -204,7 +205,7 @@ const OrderPage = () => {
       });
 
   return (
-    <Container>
+    <Container style={{ position: "relative" }}>
       <h2 className="mt-4">📋 Thực đơn</h2>
 
       <Form.Group controlId="selectTable" className="mb-3">
@@ -233,6 +234,14 @@ const OrderPage = () => {
           })}
         </Form.Select>
       </Form.Group>
+
+      {/* Giỏ hàng nằm ngay dưới phần chọn bàn */}
+      <Cart
+        cart={cart}
+        updateQuantity={updateQuantity}
+        removeFromCart={removeFromCart}
+        confirmOrder={confirmOrder}
+      />
 
       <Nav
         variant="tabs"
@@ -267,55 +276,6 @@ const OrderPage = () => {
           )}
         </>
       )}
-
-      <h4 className="mt-5">🛒 Các món đã chọn:</h4>
-      {cart.length === 0 ? (
-        <p>Chưa có món nào được chọn.</p>
-      ) : (
-        <>
-          <ul>
-            {cart.map((item) => (
-              <li key={item.id}>
-                {item.name} - {item.price.toLocaleString()} VND ×{" "}
-                <Form.Control
-                  type="number"
-                  min={1}
-                  value={item.quantity}
-                  style={{
-                    display: "inline-block",
-                    width: "70px",
-                    marginRight: "10px",
-                  }}
-                  onChange={(e) => updateQuantity(item.id, e.target.value)}
-                />
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setCart(cart.filter((i) => i.id !== item.id))}
-                >
-                  ❌
-                </Button>
-              </li>
-            ))}
-          </ul>
-          <h5>
-            💰 Tổng tiền:{" "}
-            {cart
-              .reduce((total, item) => total + item.price * item.quantity, 0)
-              .toLocaleString()}{" "}
-            VND
-          </h5>
-        </>
-      )}
-
-      <Button
-        variant="success"
-        className="mt-3"
-        onClick={() => setShowConfirmModal(true)}
-        disabled={!selectedTable || cart.length === 0}
-      >
-        ✅ Xác nhận đặt món
-      </Button>
 
       <Modal show={showConfirmModal} onHide={() => setShowConfirmModal(false)}>
         <Modal.Header closeButton>
